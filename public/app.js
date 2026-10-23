@@ -46,7 +46,7 @@ async function applyRoomSnapshot(room){if(!room||Number(room.version)<roomVersio
 function init(){
  scene=new THREE.Scene();scene.background=new THREE.Color(0x9db8d5);scene.fog=null;
  const stage=$("board-stage");camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(0,10.2,15.4);
- renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.96;
+ renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.88;
  camera.lookAt(0,0.65,-1.4);
  // Render the board first. Load the optional HDR environment after the first paint
  // so a slow HDR download/PMREM conversion cannot delay the playable board.
@@ -59,7 +59,7 @@ function init(){
    texture.mapping=THREE.EquirectangularReflectionMapping;
    const envMap=pmremGenerator.fromEquirectangular(texture).texture;
    scene.environment=envMap;
-   scene.environmentIntensity=0.55;
+   scene.environmentIntensity=0.38;
    // Use the actual equirectangular HDRI as the visible sky and distant landscape.
    scene.background=texture;
    scene.backgroundBlurriness=0;
@@ -69,9 +69,9 @@ function init(){
   },undefined,error=>{console.warn("Optional HDRI unavailable; using fast default background.",error);pmremGenerator.dispose()});
   }).catch(error=>console.warn("Optional HDR loader unavailable; using fast default background.",error));
  },1200);
- scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,0.9));
- const key=new THREE.DirectionalLight(0xffd5a0,2.0);key.position.set(-6,10,3);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=8;key.shadow.camera.bottom=-8;key.shadow.bias=-0.00015;key.shadow.normalBias=0.025;key.shadow.radius=4;scene.add(key);
- const fill=new THREE.DirectionalLight(0xcbd8ef,0.5);fill.position.set(5,6,-6);scene.add(fill);
+ scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,0.72));
+ const key=new THREE.DirectionalLight(0xffd8ad,1.45);key.position.set(-6,10,3);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=8;key.shadow.camera.bottom=-8;key.shadow.bias=-0.0002;key.shadow.normalBias=0.045;key.shadow.radius=7;scene.add(key);
+ const fill=new THREE.DirectionalLight(0xdce5f5,0.42);fill.position.set(5,6,-6);scene.add(fill);
  // No large ground plane: keep the real HDRI panorama visible all the way to the horizon.
  // Keep the existing chess table only; the exterior scenery comes from the HDRI image.
  const tableMat=new THREE.MeshStandardMaterial({color:0x292522,roughness:.27,metalness:.12});
@@ -123,7 +123,7 @@ function pieceName(piece,square){
 }
 function createPiece(piece,square){
  const name=pieceName(piece,square);let obj;
- if(customPrototypes.has(name)){obj=customPrototypes.get(name).clone(true);obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();if(piece.color==="w"&&o.material.color){o.material.color.lerp(new THREE.Color(0xd8dce2),0.28);o.material.roughness=Math.max(o.material.roughness??0.4,0.48);o.material.metalness=Math.min(o.material.metalness??0,0.08)}}}})}
+ if(customPrototypes.has(name)){obj=customPrototypes.get(name).clone(true);obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();if(piece.color==="w"&&o.material.color){o.material.color.lerp(new THREE.Color(0xd6cbb8),0.38);o.material.roughness=Math.max(o.material.roughness??0.4,0.62);o.material.metalness=0}}}})}
  else obj=makeFallbackPiece(piece.type,piece.color);
  obj.userData.square=square;obj.userData.piece=true;
  const pos=squarePos(square);
