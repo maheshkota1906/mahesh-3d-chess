@@ -55,7 +55,7 @@ function init(){
   import("https://esm.sh/three@0.180.0/examples/jsm/loaders/RGBELoader.js").then(({RGBELoader})=>{
   const pmremGenerator=new THREE.PMREMGenerator(renderer);
   pmremGenerator.compileEquirectangularShader();
-  new RGBELoader().load("https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/dikhololo_sunset_1k.hdr",texture=>{
+  new RGBELoader().load("https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/qwantani_sunset_1k.hdr",texture=>{
    texture.mapping=THREE.EquirectangularReflectionMapping;
    const envMap=pmremGenerator.fromEquirectangular(texture).texture;
    scene.environment=envMap;
