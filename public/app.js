@@ -227,24 +227,44 @@ function fitCustomPrototype(root){
  baked.updateMatrixWorld(true);
  return baked
 }
-function parseGLBBuffer(buffer, displayName="custom chess set"){
- $("upload-state").textContent="Loading "+displayName+"…";
- new GLTFLoader().parse(buffer,"",gltf=>{
-  customRoot=gltf.scene;customPrototypes.clear();loadedNames=[];customRoot.updateMatrixWorld(true);
-  customRoot.traverse(node=>{
-   if(!node.name||node.name.toLowerCase()==="chessboard")return;
-   const found=NAMES.find(n=>n.toLowerCase()===node.name.toLowerCase());
-   if(found&&(node.isMesh||node.children.length)){
-    const prototype=fitCustomPrototype(node);customPrototypes.set(found,prototype);loadedNames.push(found);
-   }
-  });
-  if(!customPrototypes.size){customRoot.traverse(node=>{if(node.isMesh&&node.name&&node.name.toLowerCase()!=="chessboard"){const prototype=fitCustomPrototype(node);customPrototypes.set(node.name,prototype);loadedNames.push(node.name)}})}
-  if(customPrototypes.size)toast("Your chess set loaded automatically.");else toast("GLB loaded, but piece names were not detected.");
- },err=>{console.error(err);$("upload-state").textContent="Could not read this GLB file.";toast("GLB import failed. Check that it is a binary GLB.")});
-}
-function loadGLB(file){
- if(!file)return;if(!file.name.toLowerCase().endsWith(".glb")){toast("Please choose a .glb file.");return}
- const reader=new FileReader();reader.onload=()=>parseGLBBuffer(reader.result,file.name);reader.onerror=()=>toast("Could not read that file.");reader.readAsArrayBuffer(file)
+async function parseGLBBuffer(buffer, displayName="your chess set"){
+  const status=$("upload-state");
+  status.textContent="Reading your chess set…";
+  try {
+    // parseAsync reliably resolves or rejects, unlike a callback-only parser path.
+    const loader=new GLTFLoader();
+    const gltf=await loader.parseAsync(buffer, "");
+    const root=gltf.scene;
+    const prototypes=new Map(), names=[];
+    root.updateMatrixWorld(true);
+    root.traverse(node=>{
+      if(!node.name || node.name.toLowerCase()==="chessboard") return;
+      const found=NAMES.find(n=>n.toLowerCase()===node.name.toLowerCase());
+      if(found && (node.isMesh || node.children.length) && !prototypes.has(found)){
+        const prototype=fitCustomPrototype(node);
+        if(prototype && prototype.children.length){prototypes.set(found,prototype);names.push(found);}
+      }
+    });
+    if(!prototypes.size){
+      root.traverse(node=>{
+        if(node.isMesh && node.name && node.name.toLowerCase()!=="chessboard" && !prototypes.has(node.name)){
+          const prototype=fitCustomPrototype(node);
+          if(prototype && prototype.children.length){prototypes.set(node.name,prototype);names.push(node.name);}
+        }
+      });
+    }
+    if(!prototypes.size) throw new Error("The GLB parsed, but no usable chess-piece meshes were found.");
+    customRoot=root;
+    customPrototypes=prototypes;
+    loadedNames=names;
+    renderPieces();
+    status.textContent="Your chess set is loaded · ready to play";
+    toast("Your chess set loaded.");
+  } catch(err) {
+    console.error("Chess GLB parse failed:",err);
+    status.textContent="Could not load your GLB. Refresh once; if this repeats, check the model file.";
+    throw err;
+  }
 }
 async function loadDefaultGLB(){
  try{
@@ -256,8 +276,10 @@ async function loadDefaultGLB(){
   finally { clearTimeout(timeout); }
   if(!response.ok)throw new Error("Default chess model not found (HTTP "+response.status+")");
   const buffer=await response.arrayBuffer();
-  // Parse after the board has rendered; this keeps the UI responsive during GLB setup.
-  requestAnimationFrame(()=>requestAnimationFrame(()=>parseGLBBuffer(buffer,"your chess set")));
+  if(buffer.byteLength<20) throw new Error("Chess GLB is empty or incomplete.");
+  // Yield to the browser so the board remains responsive while the model parses.
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  await parseGLBBuffer(buffer,"your chess set");
  }catch(error){console.error("Default chess GLB could not be loaded",error);$("upload-state").textContent="Using the built-in 3D chess set (custom model unavailable)";}
 }
 function showPieceNames(){ /* Piece-name list intentionally removed from the game UI. */ }
