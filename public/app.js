@@ -59,10 +59,11 @@ function init(){
    texture.mapping=THREE.EquirectangularReflectionMapping;
    const envMap=pmremGenerator.fromEquirectangular(texture).texture;
    scene.environment=envMap;
-   scene.environmentIntensity=0.22;
+   scene.environmentIntensity=0.7;
+   // Use the actual equirectangular HDRI as the visible sky and distant landscape.
    scene.background=texture;
-   scene.backgroundBlurriness=0.28;
-   texture.dispose();
+   scene.backgroundBlurriness=0;
+   // Keep texture alive because it is still used by scene.background.
    pmremGenerator.dispose();
   },undefined,error=>{console.warn("Optional HDRI unavailable; using fast default background.",error);pmremGenerator.dispose()});
   }).catch(error=>console.warn("Optional HDR loader unavailable; using fast default background.",error));
@@ -71,29 +72,13 @@ function init(){
  const key=new THREE.DirectionalLight(0xfff1dc,2.0);key.position.set(-4,9,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-7;key.shadow.camera.right=7;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
  const fill=new THREE.DirectionalLight(0xcbd8ef,0.45);fill.position.set(4,5,-5);scene.add(fill);
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x8c8881,roughness:.94,metalness:0}));floor.rotation.x=-Math.PI/2;floor.position.y=-.23;floor.receiveShadow=true;scene.add(floor);
- // Outdoor terrace: preserve the chess table, remove interior walls and use open-air scenery.
+ // Keep the existing chess table only; the exterior scenery comes from the HDRI image.
  const tableMat=new THREE.MeshStandardMaterial({color:0x292522,roughness:.27,metalness:.12});
  const tableTop=new THREE.Mesh(new THREE.BoxGeometry(12.8,.38,11.4),tableMat);tableTop.position.set(0,-.48,0);tableTop.receiveShadow=true;tableTop.castShadow=true;scene.add(tableTop);
  const edgeMat=new THREE.MeshStandardMaterial({color:0x747b86,roughness:.24,metalness:.55});
  const tableEdge=new THREE.Mesh(new THREE.BoxGeometry(12.92,.09,11.52),edgeMat);tableEdge.position.set(0,-.27,0);scene.add(tableEdge);
  const legMat=new THREE.MeshStandardMaterial({color:0x302119,roughness:.45});
  for(const x of [-5.7,5.7])for(const z of [-5,5]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.38,2.7,.38),legMat);leg.position.set(x,-1.9,z);leg.castShadow=true;scene.add(leg)}
- // Low stone terrace parapet in the distance; the scene remains open to the sky.
- const stoneMat=new THREE.MeshStandardMaterial({color:0xb8ad9b,roughness:.88});
- const railTop=new THREE.Mesh(new THREE.BoxGeometry(22,.18,.34),stoneMat);railTop.position.set(0,1.0,-9.1);railTop.castShadow=true;railTop.receiveShadow=true;scene.add(railTop);
- const railBase=new THREE.Mesh(new THREE.BoxGeometry(22,.9,.26),stoneMat);railBase.position.set(0,.48,-9.1);railBase.castShadow=true;railBase.receiveShadow=true;scene.add(railBase);
- for(const x of [-10.4,-7.8,-5.2,-2.6,0,2.6,5.2,7.8,10.4]){const post=new THREE.Mesh(new THREE.BoxGeometry(.14,1.25,.42),new THREE.MeshStandardMaterial({color:0x777f84,roughness:.48,metalness:.24}));post.position.set(x,.56,-8.85);post.castShadow=true;scene.add(post)}
- // Stone planters and stylized foliage frame the terrace without blocking the board.
- const planterMat=new THREE.MeshStandardMaterial({color:0xaaa08f,roughness:.84});
- const soilMat=new THREE.MeshStandardMaterial({color:0x30271e,roughness:1});
- const leafMats=[0x365b39,0x4d7445,0x718b4c].map(color=>new THREE.MeshStandardMaterial({color,roughness:.9}));
- for(const x of [-9.1,9.1]){
-  const planter=new THREE.Mesh(new THREE.BoxGeometry(1.55,1.05,1.55),planterMat);planter.position.set(x,.3,-5.9);planter.castShadow=true;planter.receiveShadow=true;scene.add(planter);
-  const soil=new THREE.Mesh(new THREE.BoxGeometry(1.35,.08,1.35),soilMat);soil.position.set(x,.86,-5.9);scene.add(soil);
-  for(let i=0;i<7;i++){const h=.75+(i%3)*.3;const leaf=new THREE.Mesh(new THREE.SphereGeometry(.28+(i%2)*.07,10,8),leafMats[i%leafMats.length]);leaf.position.set(x+Math.sin(i*2.4)*.42,1.08+h*.45,-5.9+Math.cos(i*2.4)*.42);leaf.scale.y=1.45;leaf.castShadow=true;scene.add(leaf)}
- }
- const sunFill=new THREE.DirectionalLight(0xffd7a1,2.2);sunFill.position.set(-7,10,5);sunFill.castShadow=true;sunFill.shadow.mapSize.set(1024,1024);sunFill.shadow.camera.left=-9;sunFill.shadow.camera.right=9;sunFill.shadow.camera.top=9;sunFill.shadow.camera.bottom=-9;scene.add(sunFill);
- const outdoorFill=new THREE.HemisphereLight(0xc8dff6,0x76644e,1.1);scene.add(outdoorFill);
  boardGroup=new THREE.Group();piecesGroup=new THREE.Group();markerGroup=new THREE.Group();capturedGroup=new THREE.Group();scene.add(boardGroup,piecesGroup,markerGroup,capturedGroup);
  const base=new THREE.Mesh(new THREE.BoxGeometry(8.55,.32,8.55),new THREE.MeshStandardMaterial({color:0x17191d,roughness:.32,metalness:.12}));base.position.y=-.08;base.receiveShadow=true;base.castShadow=true;boardGroup.add(base);
  const trim=new THREE.Mesh(new THREE.BoxGeometry(8.35,.1,8.35),new THREE.MeshStandardMaterial({color:0x777d87,roughness:.3,metalness:.28}));trim.position.y=.1;boardGroup.add(trim);
