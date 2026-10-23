@@ -65,13 +65,14 @@ function init(){
    scene.backgroundBlurriness=0;
    // Keep texture alive because it is still used by scene.background.
    pmremGenerator.dispose();
+   console.info("Exterior HDRI environment loaded successfully.");
   },undefined,error=>{console.warn("Optional HDRI unavailable; using fast default background.",error);pmremGenerator.dispose()});
   }).catch(error=>console.warn("Optional HDR loader unavailable; using fast default background.",error));
  },1200);
  scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,2.1));
  const key=new THREE.DirectionalLight(0xfff1dc,2.0);key.position.set(-4,9,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-7;key.shadow.camera.right=7;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
  const fill=new THREE.DirectionalLight(0xcbd8ef,0.45);fill.position.set(4,5,-5);scene.add(fill);
- const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x8c8881,roughness:.94,metalness:0}));floor.rotation.x=-Math.PI/2;floor.position.y=-.23;floor.receiveShadow=true;scene.add(floor);
+ // No large ground plane: keep the real HDRI panorama visible all the way to the horizon.
  // Keep the existing chess table only; the exterior scenery comes from the HDRI image.
  const tableMat=new THREE.MeshStandardMaterial({color:0x292522,roughness:.27,metalness:.12});
  const tableTop=new THREE.Mesh(new THREE.BoxGeometry(12.8,.38,11.4),tableMat);tableTop.position.set(0,-.48,0);tableTop.receiveShadow=true;tableTop.castShadow=true;scene.add(tableTop);
