@@ -44,7 +44,7 @@ function connectRoomEvents(){if(!roomCode||!globalThis.hatchable?.events)return;
 async function syncRoomSnapshot(){if(!roomCode||roomSyncBusy)return;roomSyncBusy=true;try{const data=await roomApi({code:roomCode},"GET");await applyRoomSnapshot(data.room)}catch(e){setRoomStatus("Connection interrupted. Waiting to reconnect…")}finally{roomSyncBusy=false}}
 async function applyRoomSnapshot(room){if(!room||Number(room.version)<roomVersion)return;roomVersion=Number(room.version);roomStateStatus=room.status;applyingRemote=true;try{const previousPly=chess.history().length;if(room.pgn){try{chess.load_pgn(room.pgn)}catch(e){chess.load(room.fen)}}else chess.load(room.fen);const remoteHistory=chess.history({verbose:true});if(remoteHistory.length>previousPly){const latest=remoteHistory[remoteHistory.length-1];playSound(latest.flags&&(latest.flags.includes("k")||latest.flags.includes("q"))?"castle":latest.captured?"capture":"move")}selected=null;legalTargets=[];lastMove=chess.history({verbose:true}).slice(-1)[0]||null;clockMinutes=Number(room.clockMinutes)||5;clockRemaining={w:Number(room.whiteMs),b:Number(room.blackMs)};clockStarted=!!room.clockStarted&&room.status==="playing";clockFinished=room.status==="finished";clockActive=clockStarted?room.turn:null;clockLastTick=performance.now();if(clockInterval)clearInterval(clockInterval);clockInterval=clockStarted?setInterval(tickClock,100):null;renderPieces();renderHistory();renderCaptured();renderClocks();if(room.status==="waiting")setRoomStatus("Room created. Waiting for your friend to join…","online");else if(room.status==="playing")setRoomStatus("Connected · Room "+room.code+" · You are "+(roomSeat==="w"?"White":"Black"),"online");else setRoomStatus(room.result||"Game finished","online");$("room-seat-label").textContent=roomSeat==="w"?"You are White":roomSeat==="b"?"You are Black":"Waiting for opponent";}finally{applyingRemote=false}}
 function init(){
- scene=new THREE.Scene();scene.background=new THREE.Color(0x252a32);scene.fog=new THREE.Fog(0x252a32,16,29);
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x9db8d5);scene.fog=null;
  const stage=$("board-stage");camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(0,8.2,11.3);
  renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.88;
  camera.lookAt(0,0,0);
@@ -55,7 +55,7 @@ function init(){
   import("https://esm.sh/three@0.180.0/examples/jsm/loaders/RGBELoader.js").then(({RGBELoader})=>{
   const pmremGenerator=new THREE.PMREMGenerator(renderer);
   pmremGenerator.compileEquirectangularShader();
-  new RGBELoader().load("/brown_photostudio_02_1k.hdr",texture=>{
+  new RGBELoader().load("https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/dikhololo_sunset_1k.hdr",texture=>{
    texture.mapping=THREE.EquirectangularReflectionMapping;
    const envMap=pmremGenerator.fromEquirectangular(texture).texture;
    scene.environment=envMap;
@@ -70,22 +70,30 @@ function init(){
  scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,2.1));
  const key=new THREE.DirectionalLight(0xfff1dc,2.0);key.position.set(-4,9,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-7;key.shadow.camera.right=7;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
  const fill=new THREE.DirectionalLight(0xcbd8ef,0.45);fill.position.set(4,5,-5);scene.add(fill);
- const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x20242b,roughness:.82}));floor.rotation.x=-Math.PI/2;floor.position.y=-.23;floor.receiveShadow=true;scene.add(floor);
- // Warm chess lounge: table beneath the board, room walls and soft architectural lighting.
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x8c8881,roughness:.94,metalness:0}));floor.rotation.x=-Math.PI/2;floor.position.y=-.23;floor.receiveShadow=true;scene.add(floor);
+ // Outdoor terrace: preserve the chess table, remove interior walls and use open-air scenery.
  const tableMat=new THREE.MeshStandardMaterial({color:0x292522,roughness:.27,metalness:.12});
  const tableTop=new THREE.Mesh(new THREE.BoxGeometry(12.8,.38,11.4),tableMat);tableTop.position.set(0,-.48,0);tableTop.receiveShadow=true;tableTop.castShadow=true;scene.add(tableTop);
  const edgeMat=new THREE.MeshStandardMaterial({color:0x747b86,roughness:.24,metalness:.55});
  const tableEdge=new THREE.Mesh(new THREE.BoxGeometry(12.92,.09,11.52),edgeMat);tableEdge.position.set(0,-.27,0);scene.add(tableEdge);
  const legMat=new THREE.MeshStandardMaterial({color:0x302119,roughness:.45});
  for(const x of [-5.7,5.7])for(const z of [-5,5]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.38,2.7,.38),legMat);leg.position.set(x,-1.9,z);leg.castShadow=true;scene.add(leg)}
- const wallMat=new THREE.MeshStandardMaterial({color:0x353944,roughness:.9});
- const backWall=new THREE.Mesh(new THREE.PlaneGeometry(24,11),wallMat);backWall.position.set(0,4.5,-8.8);scene.add(backWall);
- const leftWall=new THREE.Mesh(new THREE.PlaneGeometry(18,11),new THREE.MeshStandardMaterial({color:0x292e38,roughness:.92,side:THREE.DoubleSide}));leftWall.rotation.y=Math.PI/2;leftWall.position.set(-9,4.5,0);scene.add(leftWall);
- const rightWall=leftWall.clone();rightWall.position.x=9;scene.add(rightWall);
- const panelMat=new THREE.MeshStandardMaterial({color:0x3b414b,roughness:.62});
- for(const x of [-6,-3,0,3,6]){const panel=new THREE.Mesh(new THREE.BoxGeometry(2.35,5.8,.12),panelMat);panel.position.set(x,3.2,-8.68);scene.add(panel)}
- const roomGlow=new THREE.PointLight(0xffe6c7,24,24,2);roomGlow.position.set(0,7,0);scene.add(roomGlow);
- const warmRim=new THREE.PointLight(0xffd1a1,10,18,2);warmRim.position.set(-6,4,-3);scene.add(warmRim);
+ // Low stone terrace parapet in the distance; the scene remains open to the sky.
+ const stoneMat=new THREE.MeshStandardMaterial({color:0xb8ad9b,roughness:.88});
+ const railTop=new THREE.Mesh(new THREE.BoxGeometry(22,.18,.34),stoneMat);railTop.position.set(0,1.0,-9.1);railTop.castShadow=true;railTop.receiveShadow=true;scene.add(railTop);
+ const railBase=new THREE.Mesh(new THREE.BoxGeometry(22,.9,.26),stoneMat);railBase.position.set(0,.48,-9.1);railBase.castShadow=true;railBase.receiveShadow=true;scene.add(railBase);
+ for(const x of [-10.4,-7.8,-5.2,-2.6,0,2.6,5.2,7.8,10.4]){const post=new THREE.Mesh(new THREE.BoxGeometry(.14,1.25,.42),new THREE.MeshStandardMaterial({color:0x777f84,roughness:.48,metalness:.24}));post.position.set(x,.56,-8.85);post.castShadow=true;scene.add(post)}
+ // Stone planters and stylized foliage frame the terrace without blocking the board.
+ const planterMat=new THREE.MeshStandardMaterial({color:0xaaa08f,roughness:.84});
+ const soilMat=new THREE.MeshStandardMaterial({color:0x30271e,roughness:1});
+ const leafMats=[0x365b39,0x4d7445,0x718b4c].map(color=>new THREE.MeshStandardMaterial({color,roughness:.9}));
+ for(const x of [-9.1,9.1]){
+  const planter=new THREE.Mesh(new THREE.BoxGeometry(1.55,1.05,1.55),planterMat);planter.position.set(x,.3,-5.9);planter.castShadow=true;planter.receiveShadow=true;scene.add(planter);
+  const soil=new THREE.Mesh(new THREE.BoxGeometry(1.35,.08,1.35),soilMat);soil.position.set(x,.86,-5.9);scene.add(soil);
+  for(let i=0;i<7;i++){const h=.75+(i%3)*.3;const leaf=new THREE.Mesh(new THREE.SphereGeometry(.28+(i%2)*.07,10,8),leafMats[i%leafMats.length]);leaf.position.set(x+Math.sin(i*2.4)*.42,1.08+h*.45,-5.9+Math.cos(i*2.4)*.42);leaf.scale.y=1.45;leaf.castShadow=true;scene.add(leaf)}
+ }
+ const sunFill=new THREE.DirectionalLight(0xffd7a1,2.2);sunFill.position.set(-7,10,5);sunFill.castShadow=true;sunFill.shadow.mapSize.set(1024,1024);sunFill.shadow.camera.left=-9;sunFill.shadow.camera.right=9;sunFill.shadow.camera.top=9;sunFill.shadow.camera.bottom=-9;scene.add(sunFill);
+ const outdoorFill=new THREE.HemisphereLight(0xc8dff6,0x76644e,1.1);scene.add(outdoorFill);
  boardGroup=new THREE.Group();piecesGroup=new THREE.Group();markerGroup=new THREE.Group();capturedGroup=new THREE.Group();scene.add(boardGroup,piecesGroup,markerGroup,capturedGroup);
  const base=new THREE.Mesh(new THREE.BoxGeometry(8.55,.32,8.55),new THREE.MeshStandardMaterial({color:0x17191d,roughness:.32,metalness:.12}));base.position.y=-.08;base.receiveShadow=true;base.castShadow=true;boardGroup.add(base);
  const trim=new THREE.Mesh(new THREE.BoxGeometry(8.35,.1,8.35),new THREE.MeshStandardMaterial({color:0x777d87,roughness:.3,metalness:.28}));trim.position.y=.1;boardGroup.add(trim);
