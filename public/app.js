@@ -1,7 +1,6 @@
 import * as THREE from "https://esm.sh/three@0.180.0";
 // OrbitControls removed: board view stays fixed.
 import { GLTFLoader } from "https://esm.sh/three@0.180.0/examples/jsm/loaders/GLTFLoader.js";
-import { RGBELoader } from "https://esm.sh/three@0.180.0/examples/jsm/loaders/RGBELoader.js";
 import { Chess } from "https://esm.sh/chess.js@1.4.0";
 
 const NAMES = ["BlackBishop_01","BlackBishop_02","BlackKnight_02","BlackKnight_01","BlackKing","BlackPawn_01","BlackPawn_02","BlackPawn_03","BlackPawn_04","BlackPawn_05","BlackPawn_6","BlackPawn_07","BlackPawn_08","BlackQueen","BlackRook_01","BlackRook_02","ChessBoard","WhiteBishop_01","WhiteBishop_02","WhiteKnight_01","WhiteKnight_02","WhiteKing","WhitePawn_01","WhitePawn_02","WhitePawn_03","WhitePawn_04","WhitePawn_05","WhitePawn_06","WhitePawn_07","WhitePawn_08","WhiteQueen","WhiteRook_01","WhiteRook_02"];
@@ -47,22 +46,29 @@ async function applyRoomSnapshot(room){if(!room||Number(room.version)<roomVersio
 function init(){
  scene=new THREE.Scene();scene.background=new THREE.Color(0x252a32);scene.fog=new THREE.Fog(0x252a32,16,29);
  const stage=$("board-stage");camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(0,8.2,11.3);
- renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.88;
+ renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.88;
  camera.lookAt(0,0,0);
- // True HDR environment: visible studio backdrop plus image-based lighting/reflections.
- const pmremGenerator=new THREE.PMREMGenerator(renderer);
- pmremGenerator.compileEquirectangularShader();
- new RGBELoader().load("/brown_photostudio_02_1k.hdr",texture=>{
-  texture.mapping=THREE.EquirectangularReflectionMapping;
-  const envMap=pmremGenerator.fromEquirectangular(texture).texture;
-  scene.environment=envMap;
-  scene.environmentIntensity=0.22;
-  scene.background=texture;
-  scene.backgroundBlurriness=0.28;
-  pmremGenerator.dispose();
- },undefined,error=>{console.error("HDRI could not be loaded",error);pmremGenerator.dispose()});
+ // Render the board first. Load the optional HDR environment after the first paint
+ // so a slow HDR download/PMREM conversion cannot delay the playable board.
+ scene.background=new THREE.Color(0x252a32);
+ setTimeout(()=>{
+  import("https://esm.sh/three@0.180.0/examples/jsm/loaders/RGBELoader.js").then(({RGBELoader})=>{
+  const pmremGenerator=new THREE.PMREMGenerator(renderer);
+  pmremGenerator.compileEquirectangularShader();
+  new RGBELoader().load("/brown_photostudio_02_1k.hdr",texture=>{
+   texture.mapping=THREE.EquirectangularReflectionMapping;
+   const envMap=pmremGenerator.fromEquirectangular(texture).texture;
+   scene.environment=envMap;
+   scene.environmentIntensity=0.22;
+   scene.background=texture;
+   scene.backgroundBlurriness=0.28;
+   texture.dispose();
+   pmremGenerator.dispose();
+  },undefined,error=>{console.warn("Optional HDRI unavailable; using fast default background.",error);pmremGenerator.dispose()});
+  }).catch(error=>console.warn("Optional HDR loader unavailable; using fast default background.",error));
+ },1200);
  scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,2.1));
- const key=new THREE.DirectionalLight(0xfff1dc,2.0);key.position.set(-4,9,5);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-7;key.shadow.camera.right=7;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
+ const key=new THREE.DirectionalLight(0xfff1dc,2.0);key.position.set(-4,9,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-7;key.shadow.camera.right=7;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
  const fill=new THREE.DirectionalLight(0xcbd8ef,0.45);fill.position.set(4,5,-5);scene.add(fill);
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x20242b,roughness:.82}));floor.rotation.x=-Math.PI/2;floor.position.y=-.23;floor.receiveShadow=true;scene.add(floor);
  // Warm chess lounge: table beneath the board, room walls and soft architectural lighting.
@@ -233,21 +239,29 @@ function parseGLBBuffer(buffer, displayName="custom chess set"){
    }
   });
   if(!customPrototypes.size){customRoot.traverse(node=>{if(node.isMesh&&node.name&&node.name.toLowerCase()!=="chessboard"){const prototype=fitCustomPrototype(node);customPrototypes.set(node.name,prototype);loadedNames.push(node.name)}})}
-  $("upload-state").textContent="Loaded your chess set · ready to play";renderPieces();
   if(customPrototypes.size)toast("Your chess set loaded automatically.");else toast("GLB loaded, but piece names were not detected.");
  },err=>{console.error(err);$("upload-state").textContent="Could not read this GLB file.";toast("GLB import failed. Check that it is a binary GLB.")});
+}
+function loadGLB(file){
+ if(!file)return;if(!file.name.toLowerCase().endsWith(".glb")){toast("Please choose a .glb file.");return}
+ const reader=new FileReader();reader.onload=()=>parseGLBBuffer(reader.result,file.name);reader.onerror=()=>toast("Could not read that file.");reader.readAsArrayBuffer(file)
 }
 async function loadDefaultGLB(){
  try{
   $("upload-state").textContent="Loading your default chess set…";
-  const response=await fetch("/chess-set.glb",{cache:"no-cache"});
-  if(!response.ok)throw new Error("Default chess model not found");
-  const buffer=await response.arrayBuffer();parseGLBBuffer(buffer,"your chess set");
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  let response;
+  try { response=await fetch("/chess-set.glb",{cache:"force-cache",signal:controller.signal}); }
+  finally { clearTimeout(timeout); }
+  if(!response.ok)throw new Error("Default chess model not found (HTTP "+response.status+")");
+  const buffer=await response.arrayBuffer();
+  // Parse after the board has rendered; this keeps the UI responsive during GLB setup.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>parseGLBBuffer(buffer,"your chess set")));
  }catch(error){console.error("Default chess GLB could not be loaded",error);$("upload-state").textContent="Using the built-in 3D chess set (custom model unavailable)";}
 }
 function showPieceNames(){ /* Piece-name list intentionally removed from the game UI. */ }
 document.querySelectorAll(".mode-option").forEach(btn=>btn.addEventListener("click",()=>{unlockGameAudio();onlineMode=false;roomStateStatus="waiting";mode=btn.dataset.mode;document.querySelectorAll(".mode-option").forEach(b=>b.classList.toggle("active",b===btn));$("difficulty").disabled=mode!=="computer";$("difficulty").style.opacity=mode==="computer"?"1":".45";$("undo-btn").disabled=false;resetGame();toast(mode==="friend"?"Local two-player mode selected.":"Computer opponent selected.")}));
-$("drop-zone").addEventListener("dragleave",()=>$("drop-zone").classList.remove("drag"));
 // Piece-name UI intentionally removed.
 $("undo-btn").addEventListener("click",()=>{if(onlineMode){toast("Undo is disabled in online matches.");return}if(!chess.history().length)return;chess.undo();if(mode==="computer"&&chess.turn()==="b"&&chess.history().length)chess.undo();lastMove=chess.history({verbose:true}).slice(-1)[0]||null;selected=null;legalTargets=[];resetClock();renderPieces();renderHistory()});
 $("reset-btn").addEventListener("click",()=>{if(onlineMode){toast("To start a new online game, create a new room.");return}resetGame()});
