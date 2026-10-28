@@ -45,7 +45,7 @@ async function syncRoomSnapshot(){if(!roomCode||roomSyncBusy)return;roomSyncBusy
 async function applyRoomSnapshot(room){if(!room||Number(room.version)<roomVersion)return;roomVersion=Number(room.version);roomStateStatus=room.status;applyingRemote=true;try{const previousPly=chess.history().length;if(room.pgn){try{chess.load_pgn(room.pgn)}catch(e){chess.load(room.fen)}}else chess.load(room.fen);const remoteHistory=chess.history({verbose:true});if(remoteHistory.length>previousPly){const latest=remoteHistory[remoteHistory.length-1];playSound(latest.flags&&(latest.flags.includes("k")||latest.flags.includes("q"))?"castle":latest.captured?"capture":"move")}selected=null;legalTargets=[];lastMove=chess.history({verbose:true}).slice(-1)[0]||null;clockMinutes=Number(room.clockMinutes)||5;clockRemaining={w:Number(room.whiteMs),b:Number(room.blackMs)};clockStarted=!!room.clockStarted&&room.status==="playing";clockFinished=room.status==="finished";clockActive=clockStarted?room.turn:null;clockLastTick=performance.now();if(clockInterval)clearInterval(clockInterval);clockInterval=clockStarted?setInterval(tickClock,100):null;renderPieces();renderHistory();renderCaptured();renderClocks();if(room.status==="waiting")setRoomStatus("Room created. Waiting for your friend to join…","online");else if(room.status==="playing")setRoomStatus("Connected · Room "+room.code+" · You are "+(roomSeat==="w"?"White":"Black"),"online");else setRoomStatus(room.result||"Game finished","online");$("room-seat-label").textContent=roomSeat==="w"?"You are White":roomSeat==="b"?"You are Black":"Waiting for opponent";}finally{applyingRemote=false}}
 function init(){
  scene=new THREE.Scene();scene.background=new THREE.Color(0x9db8d5);scene.fog=null;
- const stage=$("board-stage");camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(0,12.1,13.8);
+ const stage=$("board-stage");camera=new THREE.PerspectiveCamera(36,1,.1,100);camera.position.set(0,14.8,10.8);
  renderer=new THREE.WebGLRenderer({canvas:$("board-canvas"),antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.88;
  camera.lookAt(0,0.25,0);
  // Render the board first. Load the optional HDR environment after the first paint
@@ -150,7 +150,24 @@ function renderPieces(){
 function onBoardClick(e){
  if(busy||clockFinished)return;if(onlineMode){if(roomStateStatus!=="playing"){toast("Wait for your friend to join the room.");return}if(roomSeat!==chess.turn()){toast("It is your opponent's turn.");return}}const rect=renderer.domElement.getBoundingClientRect();pointer.x=((e.clientX-rect.left)/rect.width)*2-1;pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
  const hits=raycaster.intersectObjects([...piecesGroup.children,...boardGroup.children,...markerGroup.children],true);if(!hits.length)return;
- let obj=hits[0].object;while(obj&&!obj.userData.square&&obj.parent)obj=obj.parent;if(!obj||!obj.userData.square)return;const sq=obj.userData.square;
+ // Prefer the selectable piece nearest the pointer when piece meshes overlap in screen space.
+ // This avoids a foreground piece stealing clicks intended for the king's pawn (e2).
+ const pieceHits=new Map();
+ for(const hit of hits){
+  let candidate=hit.object;
+  while(candidate&&!candidate.userData.piece&&candidate.parent)candidate=candidate.parent;
+  if(!candidate||!candidate.userData.piece||!candidate.userData.square||pieceHits.has(candidate.userData.square))continue;
+  const center=new THREE.Box3().setFromObject(candidate).getCenter(new THREE.Vector3()).project(camera);
+  const dx=(center.x-pointer.x)*rect.width*.5,dy=(center.y-pointer.y)*rect.height*.5;
+  pieceHits.set(candidate.userData.square,dx*dx+dy*dy);
+ }
+ let sq;
+ if(pieceHits.size)sq=[...pieceHits.entries()].sort((a,b)=>a[1]-b[1])[0][0];
+ else{
+  let obj=hits[0].object;while(obj&&!obj.userData.square&&obj.parent)obj=obj.parent;
+  if(!obj||!obj.userData.square)return;
+  sq=obj.userData.square;
+ }
  if(selected&&legalTargets.some(m=>m.to===sq)){const moves=chess.moves({square:selected,verbose:true}).filter(m=>m.to===sq);if(moves.length){const movingPiece=chess.get(selected);const promotes=movingPiece?.type==="p"&&((movingPiece.color==="w"&&sq[1]==="8")||(movingPiece.color==="b"&&sq[1]==="1"));makeMove(promotes?{...moves[0],promotion:undefined}:moves[0]);return}}
  const p=chess.get(sq);if(p&&p.color===chess.turn()){selected=sq;legalTargets=chess.moves({square:sq,verbose:true});renderPieces()}else{selected=null;legalTargets=[];renderPieces()}
 }
