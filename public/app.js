@@ -37,7 +37,7 @@ async function roomApi(payload,method="POST"){const response=await fetch("/api/r
 function setRoomStatus(message,type=""){const el=$("room-status");el.textContent=message;el.classList.toggle("online",type==="online");el.classList.toggle("error",type==="error")}
 function saveRoomIdentity(){try{localStorage.setItem("chess-room-"+roomCode,JSON.stringify({token:roomToken,seat:roomSeat}))}catch(e){}}
 function showRoomIdentity(){const box=$("room-code-display");box.classList.remove("hidden");$("room-code-value").textContent=roomCode||"------";$("room-seat-label").textContent=roomSeat==="w"?"You are White":roomSeat==="b"?"You are Black":"Waiting for opponent";$("share-room").disabled=!roomCode}
-function activateOnlineMode(){onlineMode=true;mode="online";document.querySelectorAll(".mode-option").forEach(b=>b.classList.remove("active"));$("difficulty").disabled=true;$("difficulty").style.opacity=".45";$("undo-btn").disabled=true;}
+function activateOnlineMode(){onlineMode=true;mode="online";$("game-screen").classList.add("online-active");document.querySelectorAll(".mode-option").forEach(b=>b.classList.remove("active"));$("difficulty").disabled=true;$("difficulty").style.opacity=".45";$("undo-btn").disabled=true;}
 async function createOnlineRoom(){try{clockMinutes=Number(document.querySelector(".clock-preset.active")?.dataset.minutes||clockMinutes);const data=await roomApi({action:"create",clockMinutes});roomCode=data.room.code;roomSeat=data.seat;roomToken=data.token;roomVersion=-1;activateOnlineMode();resetGame();saveRoomIdentity();showRoomIdentity();setRoomStatus("Room created. Share the invite link and wait for your friend.", "online");await applyRoomSnapshot(data.room);connectRoomEvents();history.replaceState(null,"",location.pathname+"?room="+roomCode)}catch(e){setRoomStatus(e.message,"error");toast(e.message)}}
 async function joinOnlineRoom(){const code=String($("room-code-input").value||new URLSearchParams(location.search).get("room")||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);if(!code){setRoomStatus("Enter a room code or open your friend's invite link.","error");return}try{let identity=null;try{identity=JSON.parse(localStorage.getItem("chess-room-"+code)||"null")}catch(e){}let data;if(identity?.token){roomCode=code;roomToken=identity.token;roomSeat=identity.seat;data=await roomApi({code},"GET");data={...data,seat:roomSeat,token:roomToken}}else{data=await roomApi({action:"join",code});roomCode=code;roomSeat=data.seat;roomToken=data.token}roomVersion=-1;activateOnlineMode();resetGame();saveRoomIdentity();showRoomIdentity();$("room-code-input").value=code;setRoomStatus(data.room.status==="waiting"?"Joined room. Waiting for the other player.":"Connected to online match.", "online");await applyRoomSnapshot(data.room);connectRoomEvents();history.replaceState(null,"",location.pathname+"?room="+roomCode)}catch(e){setRoomStatus(e.message,"error");toast(e.message)}}
 function connectRoomEvents(){if(!roomCode||!globalThis.hatchable?.events)return;try{roomEvents=globalThis.hatchable.events.connect({authUrl:"/api/events-token?code="+encodeURIComponent(roomCode)});roomEvents.channel("room:"+roomCode).on("state",()=>syncRoomSnapshot())}catch(e){setRoomStatus("Room connected; live updates reconnecting…")}}
@@ -379,7 +379,7 @@ function beginMatch(){
  humanColor=colorChoice==="random"?(Math.random()<.5?"w":"b"):colorChoice;
  mode=document.querySelector("[data-mode-choice].selected")?.dataset.modeChoice||"computer";
  if(mode==="scenario")mode="friend";
- if(mode==="online"){toast("Create a room or join an invite from the match toolbar.");mode="friend";}
+ if(mode==="online"){clockIncrement=0;if(clockMinutes===0)clockMinutes=5;}
  $("difficulty").value=$("setup-difficulty").value;
  const clockChoice=document.querySelector("[data-clock].selected")?.dataset.clock||"5";
  clockMinutes=clockChoice==="0"?0:Number(clockChoice);
@@ -392,7 +392,7 @@ function beginMatch(){
  applyArenaTheme();
  resetGame();
  resize();
- if(mode==="computer"&&humanColor==="b"){busy=true;setTimeout(()=>{computerMove();busy=false},500)}
+ if(mode==="computer"&&humanColor==="b"){busy=true;setTimeout(()=>{computerMove();busy=false},500)}if(mode==="online")createOnlineRoom();
 }
 document.querySelectorAll(".setup-step").forEach(btn=>btn.addEventListener("click",()=>setupPage(Number(btn.dataset.step))));
 $("setup-next").addEventListener("click",()=>{if(setupStep<3){setupPage(setupStep+1);return}beginMatch()});
@@ -410,7 +410,7 @@ document.querySelectorAll("[data-pieces]").forEach(btn=>btn.addEventListener("cl
 document.querySelectorAll("[data-clock]").forEach(btn=>btn.addEventListener("click",()=>selectOne("[data-clock]","data-clock",btn.dataset.clock)));
 $("setup-sounds").addEventListener("click",()=>{soundEnabled=!soundEnabled;$("setup-sounds").textContent="Sounds: "+(soundEnabled?"ON":"OFF")});
 $("setup-music").addEventListener("click",()=>{toast("No background music track is bundled yet.");});
-$("game-exit").addEventListener("click",()=>{document.body.classList.remove("match-started");setupPage(0);resize()});
+$("game-exit").addEventListener("click",()=>{document.body.classList.remove("match-started");$("game-screen").classList.remove("online-active");setupPage(0);resize()});
 setupMode("computer");setupPage(0);
 
 const inviteCode=new URLSearchParams(location.search).get("room");if(inviteCode){$("room-code-input").value=inviteCode.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);setRoomStatus("Invite link detected. Click Join to enter your friend's room.");try{const identity=JSON.parse(localStorage.getItem("chess-room-"+$("room-code-input").value)||"null");if(identity?.token){joinOnlineRoom()}}catch(e){}}
