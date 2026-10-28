@@ -123,7 +123,7 @@ function pieceName(piece,square){
 }
 function createPiece(piece,square){
  const name=pieceName(piece,square);let obj;
- if(customPrototypes.has(name)){obj=customPrototypes.get(name).clone(true);obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();if(piece.color==="w"&&o.material.color){o.material.color.lerp(new THREE.Color(0xd6cbb8),0.38);o.material.roughness=Math.max(o.material.roughness??0.4,0.62);o.material.metalness=0}}}})}
+ if(customPrototypes.has(name)){obj=customPrototypes.get(name).clone(true);obj.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();if(o.material.color){const tint=selectedPieceFinish==="gold"?(piece.color==="w"?0xc9a34c:0x46515f):selectedPieceFinish==="alabaster"?(piece.color==="w"?0xf0e8d8:0x5b3d2b):selectedPieceFinish==="stark"?(piece.color==="w"?0xffffff:0x090a0c):(piece.color==="w"?0xd6cbb8:0x252a32);o.material.color.lerp(new THREE.Color(tint),piece.color==="w"?.38:.18);if(piece.color==="w"){o.material.roughness=Math.max(o.material.roughness??0.4,0.62);o.material.metalness=0}}}}})}
  else obj=makeFallbackPiece(piece.type,piece.color);
  obj.userData.square=square;obj.userData.piece=true;
  const pos=squarePos(square);
