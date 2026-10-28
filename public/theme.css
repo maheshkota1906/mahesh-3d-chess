@@ -58,3 +58,9 @@ body.match-started .footer,body.match-started .app-shell{display:none}
 @media(min-aspect-ratio:1/1){.game-board-wrap{height:min(calc(100dvh - 110px),calc(100vw - 60px));width:min(calc(100dvh - 110px),calc(100vw - 60px))}}
 @media(max-width:600px){.setup-card{padding:20px 16px 17px;border-radius:17px}.setup-step{font-size:9px}.setup-segment button{font-size:10px}.setup-utility{gap:5px}.game-topbar{height:46px;flex-basis:46px;padding:0 10px}.game-brand{font-size:8px;letter-spacing:.7px}.game-brand-icon{width:25px;height:25px}.game-top-actions{gap:7px;font-size:8px}.game-main{padding:8px 5px 57px}.game-board-wrap{height:min(calc(100dvh - 106px),calc(100vw - 10px));width:min(calc(100dvh - 106px),calc(100vw - 10px));max-width:calc(100vw - 10px)}.game-status{left:8px;top:5px;max-width:45vw}.game-status #status{font-size:10px}.game-toolbar{bottom:7px;gap:4px;padding:4px}.game-toolbar .game-control-btn{padding:8px 9px;font-size:10px}.player-badge strong{max-width:110px}.game-player-bar .clock-box{min-width:77px}.setup-page[data-page="2"] .setup-segment.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-height:650px){.setup-card{max-height:98vh;padding-top:16px;padding-bottom:14px}.setup-page{min-height:135px}.setup-utility{margin:12px 0}.setup-rule{margin:10px 0 12px}.game-topbar{height:42px;flex-basis:42px}.game-board-wrap{height:calc(100dvh - 96px);width:calc(100dvh - 96px)}}
+
+/* Keep the board itself square while leaving room for player clocks and controls. */
+.game-board-wrap{height:auto!important;width:min(calc(100dvh - 205px),calc(100vw - 40px))!important;aspect-ratio:auto!important;flex:0 1 auto}
+#board-stage{height:auto!important;flex:0 0 auto!important;aspect-ratio:1/1!important}
+@media(max-width:600px){.game-board-wrap{width:min(calc(100dvh - 205px),calc(100vw - 10px))!important;max-width:calc(100vw - 10px)}}
+@media(max-height:650px){.game-board-wrap{width:min(calc(100dvh - 155px),calc(100vw - 10px))!important}}
