@@ -63,6 +63,7 @@ function init(){
    scene.environmentIntensity=0.38;
    // Use the actual equirectangular HDRI as the visible sky and distant landscape.
    scene.background=texture;
+   if(document.body.classList.contains("match-started"))applyArenaTheme();
    scene.backgroundBlurriness=0;
    // Keep texture alive because it is still used by scene.background.
    pmremGenerator.dispose();
