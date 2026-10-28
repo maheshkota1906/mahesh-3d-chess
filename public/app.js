@@ -9,7 +9,7 @@ const chess = new Chess();
 let scene, camera, renderer, raycaster, pointer, boardGroup, piecesGroup, markerGroup;
 let selected = null, legalTargets = [], flipped = false, mode = "computer", busy = false;
 let customRoot = null, customPrototypes = new Map(), loadedNames = [], uploadUrl = null;
-let clockMinutes=5, clockRemaining={w:300000,b:300000}, clockActive=null, clockStarted=false, clockLastTick=0, clockInterval=null, clockFinished=false, audioContext=null;
+let clockMinutes=5, clockIncrement=0, clockRemaining={w:300000,b:300000}, clockActive=null, clockStarted=false, clockLastTick=0, clockInterval=null, clockFinished=false, audioContext=null;\nlet humanColor="w", soundEnabled=true, selectedTheme="navy", selectedAtmosphere="sunset", selectedLighting="day", selectedPieceFinish="ivory", setupStep=0;
 let onlineMode=false, roomCode=null, roomSeat=null, roomToken=null, roomEvents=null, roomVersion=-1, applyingRemote=false, roomSyncBusy=false, roomStateStatus="waiting";
 let squareMeshes = new Map(), pieceObjects = new Map(), targetObjects = [], lastMove = null;
 let capturedPieces = {w:[],b:[]}, animationBusy = false, capturedGroup = null;
@@ -24,15 +24,15 @@ function renderClocks(){
  $("clock-note").textContent=clockFinished?(clockRemaining.w<=0?"White ran out of time":clockRemaining.b<=0?"Black ran out of time":"Game clock stopped"):clockStarted?"Running · "+(clockActive==="w"?"White":"Black")+" to move":"Clock starts on the first move";
 }
 function resetClock(){if(clockInterval){clearInterval(clockInterval);clockInterval=null}clockRemaining={w:clockMinutes*60000,b:clockMinutes*60000};clockActive=null;clockStarted=false;clockLastTick=0;clockFinished=false;document.querySelectorAll(".clock-preset").forEach(b=>b.classList.toggle("active",Number(b.dataset.minutes)===clockMinutes));renderClocks()}
-function startClock(){if(clockFinished||chess.isGameOver())return;if(!clockStarted){clockStarted=true;clockActive=chess.turn();clockLastTick=performance.now();clockInterval=setInterval(tickClock,100);renderClocks()}}
+function startClock(){if(clockMinutes===0||clockFinished||chess.isGameOver())return;if(!clockStarted){clockStarted=true;clockActive=chess.turn();clockLastTick=performance.now();clockInterval=setInterval(tickClock,100);renderClocks()}}
 function tickClock(){if(!clockStarted||clockFinished||!clockActive)return;const now=performance.now();clockRemaining[clockActive]-=now-clockLastTick;clockLastTick=now;if(clockRemaining[clockActive]<=0){clockRemaining[clockActive]=0;clockFinished=true;clearInterval(clockInterval);clockInterval=null;const loser=clockActive;clockActive=null;$("status").textContent=(loser==="w"?"White":"Black")+" ran out of time";$("turn-chip").textContent="TIME OUT";$("clock-note").textContent=(loser==="w"?"White":"Black")+" ran out of time";renderClocks();playSound("flag");toast((loser==="w"?"Black":"White")+" wins on time!");return}renderClocks()}
-function switchClockTurn(){if(!clockStarted||clockFinished)return;clockActive=chess.turn();clockLastTick=performance.now();renderClocks()}
+function switchClockTurn(){if(!clockStarted||clockFinished)return;const movedColor=chess.turn()==="w"?"b":"w";clockRemaining[movedColor]+=clockIncrement;clockActive=chess.turn();clockLastTick=performance.now();renderClocks()}
 let lastVoiceAnnouncement="";
 function announceMoveTurn(made){try{if(!( "speechSynthesis" in window))return;const phrase=chess.isCheckmate()?"Checkmate":chess.isCheck()?"Check":(made.color==="w"?"White":"Black")+" moved. "+(chess.turn()==="w"?"White":"Black")+" to move.";window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(phrase);u.lang="en-US";u.rate=.95;u.volume=1;window.speechSynthesis.speak(u)}catch(e){console.warn("Voice announcement unavailable",e)}}
 function unlockGameAudio(){try{const Ctx=window.AudioContext||window.webkitAudioContext;if(Ctx){if(!audioContext)audioContext=new Ctx();if(audioContext.state==="suspended")audioContext.resume()}}catch(e){}try{if("speechSynthesis" in window)window.speechSynthesis.getVoices()}catch(e){}}
 function announceChessState(){if(!("speechSynthesis" in window))return;let phrase="";if(chess.isCheckmate())phrase="Checkmate";else if(chess.isCheck())phrase="Check";if(!phrase){lastVoiceAnnouncement="";return}if(phrase===lastVoiceAnnouncement)return;lastVoiceAnnouncement=phrase;try{window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(phrase);utterance.lang="en-US";utterance.rate=.88;utterance.pitch=1;utterance.volume=.9;window.speechSynthesis.speak(utterance)}catch(e){}}
 const chessSoundPlayers={};
-function playSound(kind){try{const file=kind==="capture"?"capture.mp3":kind==="castle"?"castle.mp3":kind==="flag"?"tenseconds.mp3":"move-self.mp3";const remoteUrl=kind==="capture"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3":kind==="castle"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/castle.mp3":kind==="flag"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/tenseconds.mp3":"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3";const soundUrl=onlineMode?new URL("/sounds/"+file,location.href).href:remoteUrl;let player=chessSoundPlayers[kind];if(!player){player=new Audio();player.preload="auto";player.src=soundUrl;chessSoundPlayers[kind]=player}else if(player.src!==soundUrl){player.src=soundUrl}player.volume=(kind==="capture"||kind==="castle")?0.9:0.82;player.currentTime=0;const result=player.play();if(result&&typeof result.catch==="function")result.catch(e=>console.warn("Chess sound playback blocked or unavailable",e))}catch(e){console.warn("Chess sound unavailable",e)}}
+function playSound(kind){if(!soundEnabled)return;try{const file=kind==="capture"?"capture.mp3":kind==="castle"?"castle.mp3":kind==="flag"?"tenseconds.mp3":"move-self.mp3";const remoteUrl=kind==="capture"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3":kind==="castle"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/castle.mp3":kind==="flag"?"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/tenseconds.mp3":"https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3";const soundUrl=onlineMode?new URL("/sounds/"+file,location.href).href:remoteUrl;let player=chessSoundPlayers[kind];if(!player){player=new Audio();player.preload="auto";player.src=soundUrl;chessSoundPlayers[kind]=player}else if(player.src!==soundUrl){player.src=soundUrl}player.volume=(kind==="capture"||kind==="castle")?0.9:0.82;player.currentTime=0;const result=player.play();if(result&&typeof result.catch==="function")result.catch(e=>console.warn("Chess sound playback blocked or unavailable",e))}catch(e){console.warn("Chess sound unavailable",e)}}
 async function roomApi(payload,method="POST"){const response=await fetch("/api/rooms"+(method==="GET"?"?code="+encodeURIComponent(payload.code):""),{method,headers:method==="POST"?{"Content-Type":"application/json"}:{},body:method==="POST"?JSON.stringify(payload):undefined});const data=await response.json().catch(()=>({error:"Room service returned an invalid response."}));if(!response.ok)throw new Error(data.error||"Room request failed.");return data}
 function setRoomStatus(message,type=""){const el=$("room-status");el.textContent=message;el.classList.toggle("online",type==="online");el.classList.toggle("error",type==="error")}
 function saveRoomIdentity(){try{localStorage.setItem("chess-room-"+roomCode,JSON.stringify({token:roomToken,seat:roomSeat}))}catch(e){}}
@@ -70,8 +70,8 @@ function init(){
   }).catch(error=>console.warn("Optional HDR loader unavailable; using fast default background.",error));
  },1200);
  scene.add(new THREE.HemisphereLight(0xf4e9d8,0x343c4a,0.72));
- const key=new THREE.DirectionalLight(0xffd8ad,1.45);key.position.set(-6,10,3);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=8;key.shadow.camera.bottom=-8;key.shadow.bias=-0.0002;key.shadow.normalBias=0.045;key.shadow.radius=7;scene.add(key);
- const fill=new THREE.DirectionalLight(0xdce5f5,0.42);fill.position.set(5,6,-6);scene.add(fill);
+ const key=new THREE.DirectionalLight(selectedLighting==="night"?0xb5c9ff:0xffd8ad,selectedLighting==="night"?0.8:1.45);key.position.set(-6,10,3);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=8;key.shadow.camera.bottom=-8;key.shadow.bias=-0.0002;key.shadow.normalBias=0.045;key.shadow.radius=7;scene.add(key);
+ const fill=new THREE.DirectionalLight(0xdce5f5,selectedLighting==="night"?0.65:0.42);fill.position.set(5,6,-6);scene.add(fill);
  // No large ground plane: keep the real HDRI panorama visible all the way to the horizon.
  // Keep the existing chess table only; the exterior scenery comes from the HDRI image.
  const tableMat=new THREE.MeshStandardMaterial({color:0x292522,roughness:.27,metalness:.12});
@@ -178,7 +178,7 @@ async function makeMove(move){
  if(isPromotion&&!move.promotion){const choice=await showPromotionDialog(movingPiece.color);if(!choice)return;move={...move,promotion:choice};}
  unlockGameAudio();const movingObject=pieceObjects.get(move.from);const movingGhost=movingObject?movingObject.clone(true):null;const startPosition=movingObject?movingObject.position.clone():null;const capturedBefore=chess.get(move.to);startClock();const made=chess.move({from:move.from,to:move.to,promotion:move.promotion||"q"});if(!made)return;if(capturedBefore){capturedPieces[made.color].push({type:capturedBefore.type,color:capturedBefore.color});renderCaptured()}playSound(made.flags.includes("k")||made.flags.includes("q")?"castle":made.captured?"capture":"move");lastMove=made;selected=null;legalTargets=[];renderPieces();renderHistory();animateMoveVisual(movingGhost,startPosition,move.to,capturedBefore);
  if(onlineMode){try{const result=chess.isGameOver()?(chess.isCheckmate()?(chess.turn()==="w"?"Black wins by checkmate":"White wins by checkmate"):chess.isDraw()?"Draw":"Game over"):null;const data=await roomApi({action:"move",code:roomCode,token:roomToken,fen:chess.fen(),pgn:chess.pgn(),result});await applyRoomSnapshot(data.room)}catch(e){toast(e.message);await syncRoomSnapshot()}return}
- if(chess.isGameOver()){if(clockInterval)clearInterval(clockInterval);clockInterval=null;clockStarted=false;clockActive=null;renderClocks();updateStatus();toast(chess.isCheckmate()?"Checkmate!":chess.isDraw()?"Game drawn.":"Game over.");return}switchClockTurn();if(mode==="computer"&&chess.turn()==="b"){busy=true;setTimeout(()=>{computerMove();busy=false},380)}
+ if(chess.isGameOver()){if(clockInterval)clearInterval(clockInterval);clockInterval=null;clockStarted=false;clockActive=null;renderClocks();updateStatus();toast(chess.isCheckmate()?"Checkmate!":chess.isDraw()?"Game drawn.":"Game over.");return}switchClockTurn();if(mode==="computer"&&chess.turn()!==(humanColor)){busy=true;setTimeout(()=>{computerMove();busy=false},380)}
 }
 function showPromotionDialog(color){
  return new Promise(resolve=>{
@@ -198,7 +198,7 @@ function showPromotionDialog(color){
  });
 }
 function computerMove(){
- if(chess.isGameOver()||mode!=="computer"||onlineMode||chess.turn()!=="b")return;if(animationBusy){setTimeout(computerMove,100);return}const moves=chess.moves({verbose:true});if(!moves.length)return;let best=[];
+ if(chess.isGameOver()||mode!=="computer"||onlineMode||chess.turn()===humanColor)return;if(animationBusy){setTimeout(computerMove,100);return}const moves=chess.moves({verbose:true});if(!moves.length)return;let best=[];
  const difficulty=$("difficulty").value;
  for(const m of moves){let score=Math.random()*(difficulty==="easy"?8:difficulty==="medium"?3:.5);if(m.captured)score+=pieceValues[m.captured]* (difficulty==="easy"?.4:1);if(m.san.includes("#"))score+=1000;if(m.san.includes("+"))score+=difficulty==="hard"?1.2:.4;const test=new Chess(chess.fen());test.move(m);if(test.isCheckmate())score+=200;if(difficulty!=="easy"&&m.captured){const after=new Chess(test.fen());if(after.isCheck())score-=.1}best.push({m,score})}
  best.sort((a,b)=>b.score-a.score);makeMove(best[0].m)
@@ -317,7 +317,7 @@ async function loadDefaultGLB(){
 function showPieceNames(){ /* Piece-name list intentionally removed from the game UI. */ }
 document.querySelectorAll(".mode-option").forEach(btn=>btn.addEventListener("click",()=>{unlockGameAudio();onlineMode=false;roomStateStatus="waiting";mode=btn.dataset.mode;document.querySelectorAll(".mode-option").forEach(b=>b.classList.toggle("active",b===btn));$("difficulty").disabled=mode!=="computer";$("difficulty").style.opacity=mode==="computer"?"1":".45";$("undo-btn").disabled=false;resetGame();toast(mode==="friend"?"Local two-player mode selected.":"Computer opponent selected.")}));
 // Piece-name UI intentionally removed.
-$("undo-btn").addEventListener("click",()=>{if(onlineMode){toast("Undo is disabled in online matches.");return}if(!chess.history().length)return;chess.undo();if(mode==="computer"&&chess.turn()==="b"&&chess.history().length)chess.undo();lastMove=chess.history({verbose:true}).slice(-1)[0]||null;selected=null;legalTargets=[];resetClock();renderPieces();renderHistory()});
+$("undo-btn").addEventListener("click",()=>{if(onlineMode){toast("Undo is disabled in online matches.");return}if(!chess.history().length)return;chess.undo();if(mode==="computer"&&chess.turn()!==humanColor&&chess.history().length)chess.undo();lastMove=chess.history({verbose:true}).slice(-1)[0]||null;selected=null;legalTargets=[];resetClock();renderPieces();renderHistory()});
 $("reset-btn").addEventListener("click",()=>{if(onlineMode){toast("To start a new online game, create a new room.");return}resetGame()});
 // Fixed camera and board orientation.
 document.querySelectorAll(".clock-preset").forEach(btn=>btn.addEventListener("click",()=>{if(onlineMode){toast("Time control is fixed for this room. Create a new room to change it.");return}clockMinutes=Number(btn.dataset.minutes);resetGame();toast(clockMinutes===5?"5-minute Blitz selected.":"10-minute Rapid selected.")}));
@@ -327,4 +327,90 @@ $("join-room").addEventListener("click",joinOnlineRoom);
 $("room-code-input").addEventListener("keydown",e=>{if(e.key==="Enter")joinOnlineRoom()});
 $("share-room").addEventListener("click",async()=>{if(!roomCode)return;const inviteUrl=new URL(location.href);inviteUrl.searchParams.set("room",roomCode);const link=inviteUrl.toString();try{await navigator.clipboard.writeText(link);toast("Invite link copied. Send it to your friend.")}catch(e){$("room-code-input").value=roomCode;toast("Copy this room code and send it to your friend: "+roomCode)}});
 init();resetClock();renderHistory();loadDefaultGLB();
+function setupPage(step){
+ setupStep=Math.max(0,Math.min(3,step));
+ document.querySelectorAll(".setup-page").forEach(el=>el.classList.toggle("active",Number(el.dataset.page)===setupStep));
+ document.querySelectorAll(".setup-step").forEach(el=>el.classList.toggle("active",Number(el.dataset.step)===setupStep));
+ document.querySelectorAll(".setup-dots i").forEach((el,i)=>el.classList.toggle("active",i===setupStep));
+ const titles=[
+  ["LEVEL 1 OF 4","Player Identity","Enter your moniker and choose your pieces"],
+  ["LEVEL 2 OF 4","Opponent & Format","Choose AI level, two players, or tactical scenarios"],
+  ["LEVEL 3 OF 4","Board & Atmosphere","Customize checkerboard style and environment lighting"],
+  ["LEVEL 4 OF 4","Clock & Time Control","Select match speed or play casual"]
+ ];
+ $("setup-level").textContent=titles[step][0];$("setup-title").textContent=titles[step][1];$("setup-subtitle").textContent=titles[step][2];
+ $("setup-back").hidden=step===0;$("setup-next").textContent=step===3?"Start Match  →":"Next  ›";
+}
+function selectOne(selector,attribute,value){document.querySelectorAll(selector).forEach(el=>el.classList.toggle("selected",el.getAttribute(attribute)===value))}
+function applyArenaTheme(){
+ const palettes={
+  walnut:{light:0xd9b58a,dark:0x76503a,base:0x3a241b},
+  emerald:{light:0xd8d6bd,dark:0x2c765b,base:0x183f35},
+  navy:{light:0xd9e0e8,dark:0x253a55,base:0x101c2e},
+  marble:{light:0xe9e4d9,dark:0x24252a,base:0x17181c},
+  crimson:{light:0xe0c3ad,dark:0x702f35,base:0x3a171d},
+  slate:{light:0xc7cbd0,dark:0x555e6a,base:0x252b34}
+ };
+ const p=palettes[selectedTheme]||palettes.navy;
+ squareMeshes.forEach(mesh=>{const sq=mesh.userData.square;const file=sq.charCodeAt(0)-97,rank=Number(sq[1]);mesh.material.color.set((file+rank)%2===0?p.light:p.dark);mesh.material.needsUpdate=true});
+ const base=boardGroup?.children.find(o=>o.geometry?.type==="BoxGeometry"&&Math.abs(o.geometry.parameters?.width-8.55)<.01);
+ if(base?.material?.color)base.material.color.set(p.base);
+ if(scene){
+  const skies={sunset:0x8d776b,midnight:0x111b31,dusk:0x4b5268};
+  scene.background=new THREE.Color(skies[selectedAtmosphere]||skies.sunset);
+ }
+ if(camera)camera.position.set(0,14.8,humanColor==="b"?-10.8:10.8);
+ if(camera)camera.lookAt(0,.25,0);
+ const finishColors={ivory:{white:0xd6cbb8,black:0x252a32},gold:{white:0xc9a34c,black:0x46515f},alabaster:{white:0xf0e8d8,black:0x5b3d2b},stark:{white:0xffffff,black:0x090a0c}};
+ const finish=finishColors[selectedPieceFinish]||finishColors.ivory;
+ // Preserve GLB mesh geometry/material setup while applying only a subtle piece tint.
+ piecesGroup?.traverse(o=>{if(!o.isMesh||!o.material?.color)return;const sq=o.userData.square;const piece=sq?chess.get(sq):null;if(!piece)return;o.material.color.set(piece.color==="w"?finish.white:finish.black);o.material.needsUpdate=true});
+ resize();
+}
+function setupMode(modeChoice){
+ document.querySelectorAll("[data-mode-choice]").forEach(el=>el.classList.toggle("selected",el.dataset.modeChoice===modeChoice));
+ const labels={computer:"Play a quick match against the computer.",friend:"Two players share this screen and take turns.",online:"Create a room and invite a friend to play online.",scenario:"Scenario mode is set to local two-player for this build."};
+ $("format-note").textContent=labels[modeChoice]||labels.computer;
+ $("difficulty-wrap").style.display=modeChoice==="computer"?"block":"none";
+}
+function beginMatch(){
+ const handle=($("player-handle").value||"Grandmaster").trim().slice(0,24)||"Grandmaster";
+ const colorChoice=document.querySelector("[data-color].selected")?.dataset.color||"w";
+ humanColor=colorChoice==="random"?(Math.random()<.5?"w":"b"):colorChoice;
+ mode=document.querySelector("[data-mode-choice].selected")?.dataset.modeChoice||"computer";
+ if(mode==="scenario")mode="friend";
+ if(mode==="online"){toast("Create a room or join an invite from the match toolbar.");mode="friend";}
+ $("difficulty").value=$("setup-difficulty").value;
+ const clockChoice=document.querySelector("[data-clock].selected")?.dataset.clock||"5";
+ clockMinutes=clockChoice==="0"?0:Number(clockChoice);
+ clockIncrement=clockChoice==="3"?2000:0;
+ $("white-player-name").textContent=humanColor==="w"?handle:"Computer";
+ $("black-player-name").textContent=humanColor==="b"?handle:(mode==="computer"?"Computer":"Player 2");
+ $("game-mode-label").textContent=mode==="computer"?"VS COMPUTER":mode==="friend"?"LOCAL 2P":"ONLINE";
+ document.body.classList.add("match-started");
+ setupPage(0);
+ applyArenaTheme();
+ resetGame();
+ resize();
+ if(mode==="computer"&&humanColor==="b"){busy=true;setTimeout(()=>{computerMove();busy=false},500)}
+}
+document.querySelectorAll(".setup-step").forEach(btn=>btn.addEventListener("click",()=>setupPage(Number(btn.dataset.step))));
+$("setup-next").addEventListener("click",()=>{if(setupStep<3){setupPage(setupStep+1);return}beginMatch()});
+$("setup-back").addEventListener("click",()=>setupPage(setupStep-1));
+$("setup-restart").addEventListener("click",()=>{
+ $("player-handle").value="Grandmaster";humanColor="w";selectedTheme="navy";selectedAtmosphere="sunset";selectedLighting="day";selectedPieceFinish="ivory";clockMinutes=5;clockIncrement=0;soundEnabled=true;
+ selectOne("[data-color]","data-color","w");setupMode("computer");selectOne("[data-theme-choice]","data-theme-choice","navy");selectOne("[data-atmosphere]","data-atmosphere","sunset");selectOne("[data-lighting]","data-lighting","day");selectOne("[data-pieces]","data-pieces","ivory");selectOne("[data-clock]","data-clock","5");$("setup-sounds").textContent="Sounds: ON";$("setup-music").textContent="Music: OFF";setupPage(0);
+});
+document.querySelectorAll("[data-color]").forEach(btn=>btn.addEventListener("click",()=>selectOne("[data-color]","data-color",btn.dataset.color)));
+document.querySelectorAll("[data-mode-choice]").forEach(btn=>btn.addEventListener("click",()=>setupMode(btn.dataset.modeChoice)));
+document.querySelectorAll("[data-theme-choice]").forEach(btn=>btn.addEventListener("click",()=>{selectedTheme=btn.dataset.themeChoice;selectOne("[data-theme-choice]","data-theme-choice",selectedTheme)}));
+document.querySelectorAll("[data-atmosphere]").forEach(btn=>btn.addEventListener("click",()=>{selectedAtmosphere=btn.dataset.atmosphere;selectOne("[data-atmosphere]","data-atmosphere",selectedAtmosphere)}));
+document.querySelectorAll("[data-lighting]").forEach(btn=>btn.addEventListener("click",()=>{selectedLighting=btn.dataset.lighting;selectOne("[data-lighting]","data-lighting",selectedLighting)}));
+document.querySelectorAll("[data-pieces]").forEach(btn=>btn.addEventListener("click",()=>{selectedPieceFinish=btn.dataset.pieces;selectOne("[data-pieces]","data-pieces",selectedPieceFinish)}));
+document.querySelectorAll("[data-clock]").forEach(btn=>btn.addEventListener("click",()=>selectOne("[data-clock]","data-clock",btn.dataset.clock)));
+$("setup-sounds").addEventListener("click",()=>{soundEnabled=!soundEnabled;$("setup-sounds").textContent="Sounds: "+(soundEnabled?"ON":"OFF")});
+$("setup-music").addEventListener("click",()=>{toast("No background music track is bundled yet.");});
+$("game-exit").addEventListener("click",()=>{document.body.classList.remove("match-started");setupPage(0);resize()});
+setupMode("computer");setupPage(0);
+
 const inviteCode=new URLSearchParams(location.search).get("room");if(inviteCode){$("room-code-input").value=inviteCode.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);setRoomStatus("Invite link detected. Click Join to enter your friend's room.");try{const identity=JSON.parse(localStorage.getItem("chess-room-"+$("room-code-input").value)||"null");if(identity?.token){joinOnlineRoom()}}catch(e){}}
